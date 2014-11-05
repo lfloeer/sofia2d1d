@@ -49,7 +49,7 @@ class Denoise2D1DAdaptiveMRS(Denoise2D1DHardMRS):
         super(Denoise2D1DAdaptiveMRS, self).handle_coefficients(work_array, xy_scale, z_scale)
 
 
-def denoise_2d1d(data, sigma=5, xy_scales=4, z_scales=7, iterations=3, valid=None, **kwargs):
+def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, iterations=3, valid=None, **kwargs):
     """
 
     Inputs
