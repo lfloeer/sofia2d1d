@@ -75,7 +75,17 @@ def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, positivity=True, iter
         False values are set to 0. prior to reconstruction.
         Gets deduced from the data if not provided.
 
-    Other arguments are passed to the denoising class.
+    Other arguments are passed to the denoising class. Possible arguments are:
+        xy_approx : bool
+            Whether to consider the wavelet sub-bands representing the spatial
+            approximation during reconstruction
+
+        z_approx : bool
+            Whether to consider the wavelet sub-bands representing the spectral
+            approximation during reconstruction
+
+        total_power : bool
+            Whether to add the smooth approximation to the reconstruction
 
 
     Returns
