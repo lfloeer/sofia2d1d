@@ -5,6 +5,7 @@
 # Compile time constants
 DEF ZERO_BOUNDS = False
 DEF WRAP_BOUNDS = True
+# Unless your datacube is CRAZY BIG, 2 threads is enough
 DEF NTHREADS = 2
 
 cimport numpy as np
@@ -140,11 +141,13 @@ cdef inline void inplace_diff(float[:,:,:] a, float[:,:,:] b):
             for k in range(a.shape[2]):
                 a[i,j,k] = a[i,j,k] - b[i,j,k]
 
+
 cdef inline float sign(float x):
     if x > 0.:
         return 1.
     else:
         return -1.
+
 
 cdef class WaveletDecomposition2D1D:
     """
@@ -155,6 +158,7 @@ cdef class WaveletDecomposition2D1D:
         np.ndarray _work, _data
         int _xy_scales, _z_scales
         np.ndarray _xy_mother_function, _z_mother_function
+
 
     def __init__(self, data, xy_scales=-1, z_scales=-1):
         """
@@ -178,29 +182,51 @@ cdef class WaveletDecomposition2D1D:
         self.xy_scales = xy_scales
         self.z_scales = z_scales
 
+
     property work:
+        """
+        ndarray containing the working space of the transform
+        """
         def __get__(self):
             return self._work
 
+
     property data:
+        """
+        ndarray containing the original data to be reonstructed
+        """
         def __get__(self):
             return self._data
         def __set__(self, value):
             self._data = np.array(value, dtype=np.single)
 
+
     property xy_mother_function:
+        """
+        ndarray containing the wavelet mother function
+        for the spatial part of the transform
+        """
         def __get__(self):
             return self._xy_mother_function
         def __set__(self, value):
-            self._xy_mother_function = np.array(value).astype(np.single)
+            self._xy_mother_function = np.array(value, dtype=np.single)
+
 
     property z_mother_function:
+        """
+        narray containing the wavelet mother function
+        for the spectral part of the transform
+        """
         def __get__(self):
             return self._z_mother_function
         def __set__(self, value):
-            self._z_mother_function = np.array(value).astype(np.single)
+            self._z_mother_function = np.array(value, dtype=np.single)
+
 
     property xy_scales:
+        """
+        the number of spatial scales to use during the reconstruction
+        """
         def __get__(self):
             return self._xy_scales
         def __set__(self, value):
@@ -209,7 +235,11 @@ cdef class WaveletDecomposition2D1D:
             else:
                 self._xy_scales = np.floor(value).astype(np.intc)
 
+
     property z_scales:
+        """
+        The number of spectral scales to use during the reconstruction
+        """
         def __get__(self):
             return self._z_scales
         def __set__(self, value):
@@ -217,6 +247,7 @@ cdef class WaveletDecomposition2D1D:
                 self._z_scales = np.floor(np.log(self.data.shape[0])/np.log(2.0)).astype(np.intc)
             else:
                 self._z_scales = np.floor(value).astype(np.intc)
+
 
     def decompose(self):
         """
@@ -300,6 +331,7 @@ cdef class WaveletDecomposition2D1D:
 
             xy_scale_factor *= 2
 
+
     cdef void init_work(self):
         """
         Work array initializer. To be overriden if iterative reconstruction is desired.
@@ -310,6 +342,7 @@ cdef class WaveletDecomposition2D1D:
             float[:,:,:] data = self._data
 
         work[0] = data
+
 
     cpdef handle_coefficients(self, int work_array, int xy_scale, int z_scale):
         """
@@ -493,6 +526,10 @@ cdef class Denoise2D1DHard(WaveletDecomposition2D1D):
 
 
 cdef class Denoise2D1DHardMRS(Denoise2D1DHard):
+    """
+    Subclass of Denoise2D1DHard which adds the use of a multi-resolution support
+    to the denoising process.
+    """
     
     cdef:
         np.ndarray _mrs
@@ -515,6 +552,9 @@ cdef class Denoise2D1DHardMRS(Denoise2D1DHard):
 
 
     property mrs:
+        """
+        ndarray containing the multi-resolution support
+        """
         def __get__(self):
             return self._mrs
         def __set__(self, value):
@@ -524,6 +564,9 @@ cdef class Denoise2D1DHardMRS(Denoise2D1DHard):
 
 
     property fix_mrs:
+        """
+        Wheather to keep the MRS fixed during iterative reconstruction.
+        """
         def __get__(self):
             return self._fix_mrs
         def __set__(self, value):
@@ -554,6 +597,10 @@ cdef class Denoise2D1DHardMRS(Denoise2D1DHard):
 
 
 cdef class Denoise2D1DSoft(Denoise2D1DHard):
+    """
+    Subclass of Denoise2D1DHard which overrides the thresholding scheme to use
+    the soft thresholding rule.
+    """
     
     cdef void threshold_uniform(self, int work_array, int xy_scale, int z_scale):
         cdef:
