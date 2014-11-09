@@ -156,7 +156,7 @@ cdef class WaveletDecomposition2D1D:
         int _xy_scales, _z_scales
         np.ndarray _xy_mother_function, _z_mother_function
 
-    def __init__(self, data, xy_scales = -1, z_scales = -1):
+    def __init__(self, data, xy_scales=-1, z_scales=-1):
         """
         Initialize the decomposition object.
 
@@ -318,6 +318,7 @@ cdef class WaveletDecomposition2D1D:
         """
         np.save('coefficients_{0}_{1}.npy'.format(xy_scale, z_scale), self.work[work_array])
 
+
 cdef class Denoise2D1DHard(WaveletDecomposition2D1D):
     """
     Subclass of WaveletDecomposition2D1D which implements a hard thresholding scheme for denoising.
@@ -327,7 +328,7 @@ cdef class Denoise2D1DHard(WaveletDecomposition2D1D):
         np.ndarray _thresholds, _reconstruction
         bool _total_power, _xy_approx, _z_approx, _positivity
 
-    def __init__(self, data, thresholds, total_power = False, xy_approx = False, z_approx = False, xy_scales = -1, z_scales = -1, positivity = True):
+    def __init__(self, data, total_power=False, xy_approx=False, z_approx=False, xy_scales=-1, z_scales=-1):
         """
         Parameters
         ----------
@@ -339,62 +340,92 @@ cdef class Denoise2D1DHard(WaveletDecomposition2D1D):
 
         xy_approx, z_approx : boolean, optional
             Should the detail-approximation-coefficients (see Starck et al. 2009) be part of the reconstruction?
-
-        thresholds : 4D ndarray
-            The thresholds to use for denoising.
-            The thresholds are assumed to be organized as [y,x,xy_scale,z_scale].
-            If the first two axes are degenerate, the same threshold is used for
-            all coefficients in a given subband.
         """
 
-        self.thresholds = thresholds
         self.xy_approx = xy_approx
         self.total_power = total_power
         self.z_approx = z_approx
-        self.positivity = positivity
 
-        self._reconstruction = np.zeros(data.shape, dtype = np.single)
+        self._reconstruction = np.zeros(data.shape, dtype=np.single)
 
-        super(Denoise2D1DHard, self).__init__(data = data, xy_scales = xy_scales, z_scales = z_scales)
+        super(Denoise2D1DHard, self).__init__(data=data, xy_scales=xy_scales, z_scales=z_scales)
+
 
     property reconstruction:
+        """
+        ndarray containing the reconstruction of the data
+        """
         def __get__(self):
             return self._reconstruction
         def __set__(self, value):
-            self._reconstruction = np.array(value, dtype=np.single)
+            value = np.array(value, dtype=np.single)
+            if value.shape == self.data.shape:
+                self._reconstruction = value
+            else:
+                raise ValueError("Reconstruction must have same shape as data")
+
 
     property thresholds:
+        """
+        ndarray containing the thresholds for each wavelet sub-band
+        """
         def __get__(self):
             return self._thresholds
         def __set__(self, value):
-            if value.ndim == 4:
+            value = value.astype(np.single)
+            if value.shape == (self.xy_scales + 1, self.z_scales + 1):
                 self._thresholds = value.astype(np.single)
             else:
-                raise TypeError("Thresholds must be 4-dimensional.")
+                raise ValueError(
+                    "Thresholds must have shape %s"
+                    % (self.xy_scales + 1, self.z_scales + 1))
+
 
     property total_power:
+        """
+        Wheather add total power to reconstruction
+        """
         def __get__(self):
             return self._total_power
         def __set__(self, value):
+            value = bool(value)
             self._total_power = value
 
+
     property xy_approx:
+        """
+        Wheather to use wavelet sub-bands belonging to the spatial
+        approximation
+        """
         def __get__(self):
             return self._xy_approx
         def __set__(self, value):
+            value = bool(value)
             self._xy_approx = value
 
+
     property z_approx:
+        """
+        Wheather to use wavelet sub-bands belonging to the spectral
+        approximation
+        """
         def __get__(self):
             return self._z_approx
         def __set__(self, value):
+            value = bool(value)
             self._z_approx = value
 
+
     property positivity:
+        """
+        Wheather to enforce a positivity constraint on the reconstruction
+        """
         def __get__(self):
             return self._positivity
         def __set__(self, value):
+            value = bool(value)
             self._positivity = value
+
 
     def decompose(self):
 
@@ -411,6 +442,7 @@ cdef class Denoise2D1DHard(WaveletDecomposition2D1D):
                         if reconstruction[i,j,k] < 0:
                             reconstruction[i,j,k] = 0.
 
+
     cdef void init_work(self):
 
         cdef:
@@ -424,16 +456,13 @@ cdef class Denoise2D1DHard(WaveletDecomposition2D1D):
                 for k in range(data.shape[2]):
                     work[0,i,j,k] = data[i,j,k] - reconstruction[i,j,k]
 
+
     cpdef handle_coefficients(self, int work_array, int xy_scale, int z_scale):
 
         if (xy_scale < self._xy_scales or self._xy_approx) and (z_scale < self._z_scales or self._z_approx):
-            if self._thresholds.shape[0] == self._data.shape[1] and self._thresholds.shape[1] == self._data.shape[2]:
-                self.threshold_line_of_sight(work_array, xy_scale, z_scale)
-            else:
-                self.threshold_uniform(work_array, xy_scale, z_scale)
+            self.threshold_uniform(work_array, xy_scale, z_scale)
         elif z_scale == self._z_scales and xy_scale == self._xy_scales and self._total_power:
             self.add_total_power(work_array)
-
 
 
     cdef void threshold_uniform(self, int work_array, int xy_scale, int z_scale):
@@ -441,27 +470,13 @@ cdef class Denoise2D1DHard(WaveletDecomposition2D1D):
             float[:,:,:] data = self._data
             float[:,:,:] reconstruction = self._reconstruction
             float[:,:,:,:] work = self._work
-            float[:,:,:,:] thresholds = self._thresholds
+            float[:,:] thresholds = self._thresholds
             int i, j, k
 
         for i in range(data.shape[0]):
             for j in range(data.shape[1]):
                 for k in range(data.shape[2]):
-                    if thresholds[0,0,xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[0,0,xy_scale,z_scale]:
-                        reconstruction[i,j,k] += work[work_array,i,j,k]
-
-    cdef void threshold_line_of_sight(self, int work_array, int xy_scale, int z_scale):
-        cdef:
-            float[:,:,:] data = self._data
-            float[:,:,:] reconstruction = self._reconstruction
-            float[:,:,:,:] work = self._work
-            float[:,:,:,:] thresholds = self._thresholds
-            int i, j, k
-
-        for i in range(data.shape[0]):
-            for j in range(data.shape[1]):
-                for k in range(data.shape[2]):
-                    if thresholds[j,k,xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[j,k,xy_scale,z_scale]:
+                    if thresholds[xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[xy_scale,z_scale]:
                         reconstruction[i,j,k] += work[work_array,i,j,k]
 
 
@@ -483,9 +498,9 @@ cdef class Denoise2D1DHardMRS(Denoise2D1DHard):
         np.ndarray _mrs
         bool _fix_mrs
 
-    def __init__(self, data, thresholds, total_power = False, xy_approx = False, z_approx = False, xy_scales = -1, z_scales = -1, positivity = True):
+    def __init__(self, *args, **kwargs):
 
-        super(Denoise2D1DHardMRS, self).__init__(data, thresholds, total_power, xy_approx, z_approx, xy_scales, z_scales, positivity)
+        super(Denoise2D1DHardMRS, self).__init__(*args, **kwargs)
 
         xy_scale_range = self.xy_scales
         if self.xy_approx:
@@ -495,25 +510,33 @@ cdef class Denoise2D1DHardMRS(Denoise2D1DHard):
         if self.z_approx:
             z_scale_range += 1
 
-        self._mrs = np.zeros((xy_scale_range, z_scale_range,) + data.shape, dtype=np.short)
+        self._mrs = np.zeros((xy_scale_range, z_scale_range,) + self.data.shape, dtype=np.short)
         self._fix_mrs = False
+
 
     property mrs:
         def __get__(self):
             return self._mrs
+        def __set__(self, value):
+            value = np.array(value, dtype=np.short)
+            if value.shape == self.mrs.shape:
+                self._mrs = value
+
 
     property fix_mrs:
         def __get__(self):
             return self._fix_mrs
         def __set__(self, value):
-            self._fix_mrs = bool(value)
+            value = bool(value)
+            self._fix_mrs = value
+
 
     cdef void threshold_uniform(self, int work_array, int xy_scale, int z_scale):
         cdef:
             float[:,:,:] data = self._data
             float[:,:,:] reconstruction = self._reconstruction
             float[:,:,:,:] work = self._work
-            float[:,:,:,:] thresholds = self._thresholds
+            float[:,:] thresholds = self._thresholds
             short[:,:,:,:,:] mrs = self._mrs
             int i, j, k
 
@@ -525,30 +548,10 @@ cdef class Denoise2D1DHardMRS(Denoise2D1DHard):
                         if mrs[xy_scale, z_scale, i, j, k]:
                             reconstruction[i,j,k] += work[work_array,i,j,k]
                     
-                    elif mrs[xy_scale, z_scale, i, j, k] or (thresholds[0,0,xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[0,0,xy_scale,z_scale]):
+                    elif mrs[xy_scale, z_scale, i, j, k] or (thresholds[xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[xy_scale,z_scale]):
                         reconstruction[i,j,k] += work[work_array,i,j,k]
                         mrs[xy_scale, z_scale, i, j, k] = 1
 
-    cdef void threshold_line_of_sight(self, int work_array, int xy_scale, int z_scale):
-        cdef:
-            float[:,:,:] data = self._data
-            float[:,:,:] reconstruction = self._reconstruction
-            float[:,:,:,:] work = self._work
-            float[:,:,:,:] thresholds = self._thresholds
-            short[:,:,:,:,:] mrs = self._mrs
-            int i, j, k
-
-        for i in range(data.shape[0]):
-            for j in range(data.shape[1]):
-                for k in range(data.shape[2]):
-
-                    if self._fix_mrs:
-                        if mrs[xy_scale, z_scale, i, j, k]:
-                            reconstruction[i,j,k] += work[work_array,i,j,k]
-
-                    elif mrs[xy_scale, z_scale, i, j, k] or (thresholds[j,k,xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[j,k,xy_scale,z_scale]):
-                        reconstruction[i,j,k] += work[work_array,i,j,k]
-                        mrs[xy_scale, z_scale, i, j, k] = 1
 
 cdef class Denoise2D1DSoft(Denoise2D1DHard):
     
@@ -557,28 +560,15 @@ cdef class Denoise2D1DSoft(Denoise2D1DHard):
             float[:,:,:] data = self._data
             float[:,:,:] reconstruction = self._reconstruction
             float[:,:,:,:] work = self._work
-            float[:,:,:,:] thresholds = self._thresholds
+            float[:,:] thresholds = self._thresholds
             int i, j, k
 
         for i in range(data.shape[0]):
             for j in range(data.shape[1]):
                 for k in range(data.shape[2]):
-                    if thresholds[0,0,xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[0,0,xy_scale,z_scale]:
-                        reconstruction[i,j,k] += abs(work[work_array,i,j,k] - thresholds[0,0,xy_scale,z_scale]) * sign(work[work_array,i,j,k])
+                    if thresholds[xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[xy_scale,z_scale]:
+                        reconstruction[i,j,k] += abs(work[work_array,i,j,k] - thresholds[xy_scale,z_scale]) * sign(work[work_array,i,j,k])
 
-    cdef void threshold_line_of_sight(self, int work_array, int xy_scale, int z_scale):
-        cdef:
-            float[:,:,:] data = self._data
-            float[:,:,:] reconstruction = self._reconstruction
-            float[:,:,:,:] work = self._work
-            float[:,:,:,:] thresholds = self._thresholds
-            int i, j, k
-
-        for i in range(data.shape[0]):
-            for j in range(data.shape[1]):
-                for k in range(data.shape[2]):
-                    if thresholds[j,k,xy_scale,z_scale] >= 0 and abs(work[work_array,i,j,k]) > thresholds[j,k,xy_scale,z_scale]:
-                        reconstruction[i,j,k] += abs(work[work_array,i,j,k] - thresholds[j,k,xy_scale,z_scale]) * sign(work[work_array,i,j,k])
 
 cdef class WaveletDecomposition1D:
     
@@ -653,6 +643,7 @@ cdef class WaveletDecomposition1D:
 
     cpdef handle_coefficients(self, int work_array, int scale):
         np.save('coefficients_{0}.npy'.format(scale), self._work[work_array])
+
 
 cdef class Denoise1DHardMRS(WaveletDecomposition1D):
     
