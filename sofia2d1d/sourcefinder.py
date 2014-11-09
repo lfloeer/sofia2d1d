@@ -28,14 +28,10 @@ class Denoise2D1DAdaptiveMRS(Denoise2D1DHardMRS):
 
         self.xy_mother_function = b3spline
         self.z_mother_function = b3spline
-
-        #TODO: Bad Hack
-        kwargs['thresholds'] = np.zeros((1, 1, 1, 1))
         
         super(Denoise2D1DAdaptiveMRS, self).__init__(*args, **kwargs)
         
-        #TODO: Bad Hack
-        self.thresholds = np.zeros((1, 1, self.xy_scales + 1, self.z_scales + 1))
+        self.thresholds = np.zeros((self.xy_scales + 1, self.z_scales + 1))
 
     
     def handle_coefficients(self, work_array, xy_scale, z_scale):
@@ -43,8 +39,7 @@ class Denoise2D1DAdaptiveMRS(Denoise2D1DHardMRS):
         subband_rms = the_median(np.abs(self.work[work_array])) / 0.6745
         subband_threshold = subband_rms * self.sigma
         
-        #TODO: Bad Hack
-        self.thresholds[0, 0, xy_scale, z_scale] = subband_threshold
+        self.thresholds[xy_scale, z_scale] = subband_threshold
         
         super(Denoise2D1DAdaptiveMRS, self).handle_coefficients(work_array, xy_scale, z_scale)
 
