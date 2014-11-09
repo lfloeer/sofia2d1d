@@ -44,7 +44,7 @@ class Denoise2D1DAdaptiveMRS(Denoise2D1DHardMRS):
         super(Denoise2D1DAdaptiveMRS, self).handle_coefficients(work_array, xy_scale, z_scale)
 
 
-def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, iterations=3, valid=None, **kwargs):
+def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, positivity=True, iterations=3, valid=None, **kwargs):
     """
 
     Inputs
@@ -63,6 +63,9 @@ def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, iterations=3, valid=N
 
     z_scales : int, optional
         The number of spectral scales to use for decomposition.
+
+    positivity : bool, optional
+        Enforce positivity on the reconstruction
 
     iterations : int, optional
         The number of iterations for the reconstruction process.
@@ -95,6 +98,8 @@ def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, iterations=3, valid=N
         xy_scales=xy_scales,
         z_scales=z_scales,
         **kwargs)
+
+    denoiser.positivity = positivity
 
     for iteration in xrange(iterations):
         denoiser.decompose()
