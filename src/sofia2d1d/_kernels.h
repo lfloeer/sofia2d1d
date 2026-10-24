@@ -32,12 +32,12 @@ static inline void omp_set_num_threads(int n) { (void)n; }
 
 /*
  * Portable builds get an AVX2 version of each kernel as well, selected at
- * load time on CPUs that support it (needs ifunc support, i.e. ELF/glibc).
+ * load time on CPUs that support it (needs ifunc support, i.e. glibc; not musl).
  * Floating point contraction is disabled at compile time, so both versions
  * give identical results.
  */
-#if defined(__x86_64__) && defined(__ELF__) && !defined(__AVX2__) && !defined(S2_NO_DISPATCH) \
-    && defined(__has_attribute)
+#if defined(__x86_64__) && defined(__ELF__) && defined(__GLIBC__) && !defined(__AVX2__) \
+    && !defined(S2_NO_DISPATCH) && defined(__has_attribute)
 #if __has_attribute(target_clones)
 #define S2_KERNEL __attribute__((target_clones("default", "avx2"))) static
 #endif

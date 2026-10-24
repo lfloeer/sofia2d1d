@@ -9,6 +9,10 @@ SOFIA2D1D_NATIVE=1
     builds already contain AVX2 versions of the inner loops.
 SOFIA2D1D_NO_OPENMP=1
     Build without OpenMP (single-threaded).
+SOFIA2D1D_LIBOMP_PREFIX=/path/to/prefix
+    Use the OpenMP runtime (libomp) installed in this prefix, e.g. a
+    conda-forge llvm-openmp environment. Needed with compilers that do not ship
+    an OpenMP runtime (Apple clang) unless Homebrew's libomp is found.
 """
 
 import os
@@ -53,22 +57,28 @@ def _compiles(compiler, compile_args, link_args):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def _homebrew_libomp():
-    """Compile and link flags for Homebrew's libomp on macOS (Apple clang has no OpenMP)."""
+def _libomp_flags(prefix):
+    """Compile and link flags for the libomp in prefix (for clang without its own OpenMP runtime)."""
+    lib = os.path.join(prefix, "lib")
+    return (
+        ["-Xpreprocessor", "-fopenmp", "-I" + os.path.join(prefix, "include")],
+        ["-L" + lib, "-lomp", "-Wl,-rpath," + lib],
+    )
+
+
+def _libomp_prefixes():
+    """Candidate libomp installations: SOFIA2D1D_LIBOMP_PREFIX, then Homebrew on macOS."""
     prefixes = []
-    try:
-        out = subprocess.run(["brew", "--prefix", "libomp"], capture_output=True, text=True, check=True)
-        prefixes.append(out.stdout.strip())
-    except (OSError, subprocess.CalledProcessError):
-        pass
-    prefixes += ["/opt/homebrew/opt/libomp", "/usr/local/opt/libomp"]
-    for prefix in prefixes:
-        if os.path.isdir(os.path.join(prefix, "include")):
-            return (
-                ["-Xpreprocessor", "-fopenmp", "-I" + os.path.join(prefix, "include")],
-                ["-L" + os.path.join(prefix, "lib"), "-lomp"],
-            )
-    return None
+    if os.environ.get("SOFIA2D1D_LIBOMP_PREFIX"):
+        prefixes.append(os.environ["SOFIA2D1D_LIBOMP_PREFIX"])
+    if sys.platform == "darwin":
+        try:
+            out = subprocess.run(["brew", "--prefix", "libomp"], capture_output=True, text=True, check=True)
+            prefixes.append(out.stdout.strip())
+        except (OSError, subprocess.CalledProcessError):
+            pass
+        prefixes += ["/opt/homebrew/opt/libomp", "/usr/local/opt/libomp"]
+    return [p for p in prefixes if os.path.isfile(os.path.join(p, "include", "omp.h"))]
 
 
 class BuildExt(build_ext):
@@ -81,10 +91,12 @@ class BuildExt(build_ext):
         else:
             compile_args = ["-O3", "-ffp-contract=off"]
             candidates = [(["-fopenmp"], ["-fopenmp"])]
-            if sys.platform == "darwin":
-                libomp = _homebrew_libomp()
-                if libomp:
-                    candidates.append(libomp)
+            libomp = [_libomp_flags(p) for p in _libomp_prefixes()]
+            # An explicitly requested libomp takes precedence over the compiler's own runtime
+            if os.environ.get("SOFIA2D1D_LIBOMP_PREFIX"):
+                candidates = libomp + candidates
+            else:
+                candidates += libomp
             if _flag_set("SOFIA2D1D_NATIVE", ""):
                 compile_args.append("-march=native")
 

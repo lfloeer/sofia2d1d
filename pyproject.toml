@@ -46,6 +46,9 @@ cache-keys = [
     { file = "setup.py" },
     { file = "src/sofia2d1d/*.pyx" },
     { file = "src/sofia2d1d/*.h" },
+    { env = "SOFIA2D1D_NATIVE" },
+    { env = "SOFIA2D1D_NO_OPENMP" },
+    { env = "SOFIA2D1D_LIBOMP_PREFIX" },
 ]
 
 [tool.pytest.ini_options]
