@@ -70,8 +70,8 @@ uv build                 # sdist and wheel in dist/
 
 uv rebuilds the extension automatically when `pyudwt.pyx`, `_kernels.h`,
 `setup.py` or `pyproject.toml` change. Wheels for Linux, macOS and Windows are
-built with cibuildwheel by the `Wheels` workflow when a `v*` tag is pushed,
-and published to PyPI once trusted publishing is set up for the project.
+built with cibuildwheel by the `Wheels` workflow when a `v*` tag is pushed
+(or on demand) and attached to the workflow run as artifacts.
 
 Layout:
 
