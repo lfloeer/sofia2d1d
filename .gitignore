@@ -54,6 +54,8 @@ docs/_build/
 target/
 
 # Cython output
-sofia2d1d/pyudwt.c
-sofia2d1d/pyudwt.cpp
+src/sofia2d1d/pyudwt.c
+src/sofia2d1d/pyudwt.cpp
 .pytest_cache/
+.venv/
+dist/

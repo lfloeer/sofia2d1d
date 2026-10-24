@@ -1,0 +1,3 @@
+include src/sofia2d1d/*.pyx src/sofia2d1d/*.h src/sofia2d1d/*.pyi src/sofia2d1d/py.typed
+recursive-include tests *.py
+exclude src/sofia2d1d/*.cpp src/sofia2d1d/*.c

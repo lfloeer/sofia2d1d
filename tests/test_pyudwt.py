@@ -1,21 +1,20 @@
 import numpy as np
 import pytest
 
+import reference
 from sofia2d1d import pyudwt
 from sofia2d1d.sourcefinder import denoise_2d1d
-
-import reference
 
 
 def make_cube(shape, seed=0, sources=8):
     rng = np.random.default_rng(seed)
     cube = rng.standard_normal(shape).astype(np.float32)
-    z, y, x = np.ogrid[:shape[0], :shape[1], :shape[2]]
+    z, y, x = np.ogrid[: shape[0], : shape[1], : shape[2]]
     for _ in range(sources):
         cz, cy, cx = rng.uniform(0, 1, 3) * shape
         w = rng.uniform(1, 4)
         cube += np.float32(rng.uniform(1, 4)) * np.exp(
-            -((z - cz)**2 / (2 * (2 * w)**2) + (y - cy)**2 / (2 * w**2) + (x - cx)**2 / (2 * w**2))
+            -((z - cz) ** 2 / (2 * (2 * w) ** 2) + (y - cy) ** 2 / (2 * w**2) + (x - cx) ** 2 / (2 * w**2))
         ).astype(np.float32)
     return cube
 
@@ -24,20 +23,24 @@ SHAPES = [(16, 24, 20), (17, 23, 13), (40, 31, 70), (5, 9, 70), (64, 8, 8)]
 
 
 @pytest.mark.parametrize("shape", SHAPES)
-@pytest.mark.parametrize("options", [
-    {},
-    {'xy_approx': True, 'z_approx': True, 'total_power': True, 'positivity': False, 'iterations': 2},
-    {'total_power': True, 'xy_scales': 2, 'z_scales': 3},
-    {'z_approx': True, 'xy_scales': 0},
-    {'xy_approx': True, 'z_scales': 0, 'iterations': 1},
-])
+@pytest.mark.parametrize(
+    "options",
+    [
+        {},
+        {"xy_approx": True, "z_approx": True, "total_power": True, "positivity": False, "iterations": 2},
+        {"total_power": True, "xy_scales": 2, "z_scales": 3},
+        {"z_approx": True, "xy_scales": 0},
+        {"xy_approx": True, "z_scales": 0, "iterations": 1},
+    ],
+)
 def test_adaptive_matches_reference(shape, options):
     cube = make_cube(shape)
     options = dict(options)
-    iterations = options.pop('iterations', 3)
-    positivity = options.pop('positivity', True)
-    expected, thresholds, mrs = reference.denoise(cube, sigma=3, iterations=iterations,
-                                                  positivity=positivity, **options)
+    iterations = options.pop("iterations", 3)
+    positivity = options.pop("positivity", True)
+    expected, thresholds, mrs = reference.denoise(
+        cube, sigma=3, iterations=iterations, positivity=positivity, **options
+    )
 
     denoiser = pyudwt.Denoise2D1DAdaptiveMRS(3, cube, **options)
     denoiser.positivity = positivity
@@ -52,11 +55,14 @@ def test_adaptive_matches_reference(shape, options):
 
 
 @pytest.mark.parametrize("mode", ["periodic", "reflect", "zero"])
-@pytest.mark.parametrize("cls, rule", [
-    (pyudwt.Denoise2D1DHard, 'hard'),
-    (pyudwt.Denoise2D1DSoft, 'soft'),
-    (pyudwt.Denoise2D1DHardMRS, 'mrs'),
-])
+@pytest.mark.parametrize(
+    "cls, rule",
+    [
+        (pyudwt.Denoise2D1DHard, "hard"),
+        (pyudwt.Denoise2D1DSoft, "soft"),
+        (pyudwt.Denoise2D1DHardMRS, "mrs"),
+    ],
+)
 def test_fixed_thresholds(mode, cls, rule):
     cube = make_cube((24, 20, 19), seed=1)
     denoiser = cls(cube, total_power=True)
@@ -67,8 +73,9 @@ def test_fixed_thresholds(mode, cls, rule):
     denoiser.positivity = True
     for _ in range(2):
         denoiser.decompose()
-    expected, _, _ = reference.denoise(cube, thresholds=t, rule=rule, iterations=2,
-                                       total_power=True, mode=mode)
+    expected, _, _ = reference.denoise(
+        cube, thresholds=t, rule=rule, iterations=2, total_power=True, mode=mode
+    )
     np.testing.assert_array_equal(denoiser.reconstruction, expected)
 
 
@@ -109,7 +116,6 @@ def test_results_do_not_depend_on_threads():
 
 
 class Collector(pyudwt.WaveletDecomposition2D1D):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.bands = []
@@ -125,7 +131,7 @@ def test_generic_decomposition(shape):
     collector.decompose()
     expected = list(reference.subbands(cube, collector.xy_scales, collector.z_scales))
     assert [b[:2] for b in collector.bands] == [b[:2] for b in expected]
-    for (_, _, got), (_, _, want) in zip(collector.bands, expected):
+    for (_, _, got), (_, _, want) in zip(collector.bands, expected, strict=True):
         np.testing.assert_array_equal(got, want)
     # The transform is exactly invertible by summation (up to rounding)
     total = np.sum([b[2].astype(np.float64) for b in collector.bands], axis=0)
@@ -157,7 +163,7 @@ def test_1d_decomposition():
     Collector1D(spectrum).decompose()
     np.testing.assert_allclose(np.sum(bands, axis=0), spectrum, atol=1e-4)
 
-    denoiser = pyudwt.Denoise1DHardMRS(spectrum, thresholds=[3.] * 8)
+    denoiser = pyudwt.Denoise1DHardMRS(spectrum, thresholds=[3.0] * 8)
     denoiser.decompose()
     denoiser.decompose()
     assert np.all(denoiser.reconstruction[:80] == 0)

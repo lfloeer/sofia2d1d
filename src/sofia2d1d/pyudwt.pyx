@@ -28,7 +28,6 @@ from cython.parallel cimport prange, parallel, threadid
 from libc.stdlib cimport malloc, calloc, realloc, free
 from libc.string cimport memcpy
 from libc.math cimport fabsf, INFINITY
-cimport openmp
 
 import numpy as np
 cimport numpy as cnp
@@ -75,14 +74,19 @@ cdef enum:
     MODE_STATS = 2
 
 
+def openmp_enabled():
+    """Whether the extension was built with OpenMP, i.e. can use several threads."""
+    return bool(S2_HAVE_OPENMP)
+
+
 def set_num_threads(int n):
     """Set the number of OpenMP threads used by all transforms."""
-    openmp.omp_set_num_threads(max(1, n))
+    omp_set_num_threads(max(1, n))
 
 
 def get_num_threads():
     """Return the number of OpenMP threads used by all transforms."""
-    return openmp.omp_get_max_threads()
+    return omp_get_max_threads()
 
 
 def _index_table(Py_ssize_t size, Py_ssize_t ksize, Py_ssize_t step, int mode):
@@ -123,6 +127,9 @@ cdef inline Py_ssize_t* _iptr(cnp.ndarray a):
 # ---------------------------------------------------------------------------
 
 cdef extern from "_kernels.h" nogil:
+    int S2_HAVE_OPENMP
+    int omp_get_max_threads()
+    void omp_set_num_threads(int n)
     void s2_conv5(const float* r0, const float* r1, const float* r2, const float* r3, const float* r4,
                   float* out, Py_ssize_t n, const float* k)
     void s2_conv5_detail(const float* r0, const float* r1, const float* r2, const float* r3, const float* r4,
@@ -967,7 +974,7 @@ cdef class Denoise2D1DHard(WaveletDecomposition2D1D):
             RowCtx c
             int Z = self._z_scales
             int z, rc, last = -1
-            int nthreads = openmp.omp_get_max_threads()
+            int nthreads = omp_get_max_threads()
             cnp.ndarray action = np.zeros(Z + 1, dtype=np.intc)
             cnp.ndarray thr
 

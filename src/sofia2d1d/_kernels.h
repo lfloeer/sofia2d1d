@@ -14,6 +14,16 @@
 #include <stdint.h>
 #include <string.h>
 
+/* OpenMP is optional: without it, everything runs on a single thread. */
+#ifdef _OPENMP
+#include <omp.h>
+#define S2_HAVE_OPENMP 1
+#else
+#define S2_HAVE_OPENMP 0
+static inline int omp_get_max_threads(void) { return 1; }
+static inline void omp_set_num_threads(int n) { (void)n; }
+#endif
+
 #if defined(_MSC_VER)
 #define S2_RESTRICT __restrict
 #else
