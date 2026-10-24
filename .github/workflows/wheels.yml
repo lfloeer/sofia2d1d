@@ -27,10 +27,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install OpenMP (macOS)
+        # Homebrew's libomp targets the runner's macOS version; conda-forge's
+        # llvm-openmp supports macOS 11 and later, and so do the wheels then.
         if: runner.os == 'macOS'
         run: |
-          brew install libomp
-          echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> "$GITHUB_ENV"
+          curl -Ls https://micro.mamba.pm/api/micromamba/osx-arm64/latest | tar -xj bin/micromamba
+          ./bin/micromamba create --yes --prefix "$HOME/libomp" --channel conda-forge llvm-openmp
+          echo "SOFIA2D1D_LIBOMP_PREFIX=$HOME/libomp" >> "$GITHUB_ENV"
+          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> "$GITHUB_ENV"
       - uses: pypa/cibuildwheel@v3.1
       - uses: actions/upload-artifact@v4
         with:
