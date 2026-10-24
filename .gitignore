@@ -52,3 +52,10 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Cython output
+src/sofia2d1d/pyudwt.c
+src/sofia2d1d/pyudwt.cpp
+.pytest_cache/
+.venv/
+dist/
