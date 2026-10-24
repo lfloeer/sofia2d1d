@@ -1,47 +1,6 @@
 import numpy as np
-from scipy import ndimage as nd
 
-from .pyudwt import Denoise2D1DHardMRS
-
-b3spline = np.array([1.,4.,6.,4.,1.]) / 16.
-
-# Try to use MUCH faster median implementation
-# from bottleck, else fallback to numpy.median
-try:
-    from bottleneck import median as the_median
-except ImportError:
-    the_median = np.median
-
-
-class Denoise2D1DAdaptiveMRS(Denoise2D1DHardMRS):
-    """
-    De-noise a three-dimensional data cube using the 2D1D wavelet
-    transform with a multi-resolution support as discussed in 
-    Starck et al. 2011 and Flöer & Winkel 2012.
-
-    The transform assumes that the first axis is the spectral axis.
-    """
-
-    def __init__(self, sigma, *args, **kwargs):
-
-        self.sigma = sigma
-
-        self.xy_mother_function = b3spline
-        self.z_mother_function = b3spline
-        
-        super(Denoise2D1DAdaptiveMRS, self).__init__(*args, **kwargs)
-        
-        self.thresholds = np.zeros((self.xy_scales + 1, self.z_scales + 1))
-
-    
-    def handle_coefficients(self, work_array, xy_scale, z_scale):
-        
-        subband_rms = the_median(np.abs(self.work[work_array])) / 0.6745
-        subband_threshold = subband_rms * self.sigma
-        
-        self.thresholds[xy_scale, z_scale] = subband_threshold
-        
-        super(Denoise2D1DAdaptiveMRS, self).handle_coefficients(work_array, xy_scale, z_scale)
+from .pyudwt import Denoise2D1DAdaptiveMRS, b3spline, set_num_threads, get_num_threads
 
 
 def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, positivity=True, iterations=3, valid=None, **kwargs):
@@ -87,6 +46,9 @@ def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, positivity=True, iter
         total_power : bool
             Whether to add the smooth approximation to the reconstruction
 
+    The number of threads is taken from OMP_NUM_THREADS or can be set with
+    sofia2d1d.sourcefinder.set_num_threads.
+
 
     Returns
     -------
@@ -95,12 +57,13 @@ def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, positivity=True, iter
         The reconstructed data
     """
 
-    data = np.array(data, dtype=np.single)
-    
+    data = np.array(data, dtype=np.single, order='C')
+
     if valid is None:
         valid = np.isfinite(data)
+    invalid = ~np.asarray(valid, dtype=bool)
 
-    data[~valid] = 0.
+    data[invalid] = 0.
 
     denoiser = Denoise2D1DAdaptiveMRS(
         sigma=sigma,
@@ -111,10 +74,10 @@ def denoise_2d1d(data, sigma=5, xy_scales=-1, z_scales=-1, positivity=True, iter
 
     denoiser.positivity = positivity
 
-    for iteration in xrange(iterations):
+    for iteration in range(iterations):
         denoiser.decompose()
 
     reconstruction = denoiser.reconstruction
-    reconstruction[~valid] = 0.
+    reconstruction[invalid] = 0.
 
     return reconstruction
